@@ -11,6 +11,7 @@ import (
 type User struct {
 	Username string
 	Password string // hashed
+	isAdmin  int
 }
 
 type SASL struct {
@@ -80,8 +81,11 @@ CREATE TABLE Channel (
 );
 `
 
+const migration1 = "ALTER TABLE User ADD COLUMN isAdmin INTEGER NOT NULL DEFAULT 0 CHECK(isAdmin IN (0,1));"
+
 var migrations = []string{
 	"", // migration #0 is reserved for schema initialization
+	migration1,
 }
 
 type DB struct {
@@ -225,6 +229,17 @@ func (db *DB) UpdatePassword(user *User) error {
 	SET password = ?
 	WHERE username = ?`,
 		password, user.Username)
+	return err
+}
+
+func (db *DB) ToggleAdmin(username string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	_, err := db.db.Exec(`UPDATE User
+	SET isAdmin = ((isAdmin | 1) - (isAdmin & 1))
+	WHERE username = ?`,
+		username)
 	return err
 }
 

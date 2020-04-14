@@ -17,6 +17,7 @@ const usage = `usage: sojuctl [-config path] <action> [options...]
   create-user <username>	Create a new user
   change-password <username> 	Change password for a user
   help				Show this help message
+  toggle-admin <username>	Toggle admin status
 `
 
 func init() {
@@ -99,7 +100,15 @@ func main() {
 		if err := db.UpdatePassword(&user); err != nil {
 			log.Fatalf("failed to update password: %v", err)
 		}
-
+	case "toggle-admin":
+		username := flag.Arg(1)
+		if username == "" {
+			flag.Usage()
+			os.Exit(1)
+		}
+		if err := db.ToggleAdmin(username); err != nil {
+			log.Fatalf("failed to toggle admin status: %v", err)
+		}
 	default:
 		flag.Usage()
 		if cmd != "help" {

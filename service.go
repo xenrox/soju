@@ -124,6 +124,15 @@ func init() {
 			desc:   "change your password",
 			handle: handlePasswordChange,
 		},
+		"user": {
+			children: serviceCommandSet{
+				"create": {
+					usage:  "-name <name> -passwd <password>",
+					desc:   "add a user",
+					handle: handleServiceUserCreate,
+				},
+			},
+		},
 	}
 }
 
@@ -275,5 +284,40 @@ func handlePasswordChange(dc *downstreamConn, params []string) error {
 	}
 
 	sendServicePRIVMSG(dc, "password updated")
+	return nil
+}
+
+func handleServiceUserCreate(dc *downstreamConn, params []string) error {
+	if dc.user.User.isAdmin == 0 {
+		return fmt.Errorf("not authorized for this command: %v", dc.user.User.Username)
+	}
+	fs := newFlagSet()
+	name := fs.String("name", "", "")
+	passwd := fs.String("passwd", "", "")
+
+	if err := fs.Parse(params); err != nil {
+		return err
+	}
+	if *name == "" {
+		return fmt.Errorf("flag -name is required")
+	}
+	if *passwd == "" {
+		return fmt.Errorf("flag -passwd is required")
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(*passwd), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %v", err)
+	}
+
+	user := User{
+		Username: *name,
+		Password: string(hashed),
+	}
+	if err := dc.srv.db.CreateUser(&user); err != nil {
+		return err
+	}
+
+	sendServicePRIVMSG(dc, "user added")
 	return nil
 }
